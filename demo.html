@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="ar" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arabic Text Toolkit Demo</title>
+<link rel="icon" href="data:,">
+<!--
+  Demo page for recording a video of arabic_text.py (not a website).
+  Open it, then call window.runDemo() from the recorder; it returns a
+  Promise that resolves with the duration in seconds. Add ?autoplay to
+  the URL to start it automatically. Every output below was captured
+  from a real run of the command line tool.
+-->
+<style>
+  /* Arabic characters use a proper Arabic font, everything else Consolas. */
+  @font-face {
+    font-family: "DemoArabic";
+    src: local("Segoe UI"), local("SegoeUI"), local("Tahoma"), local("Geeza Pro"), local("Noto Naskh Arabic");
+    unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+    size-adjust: 108%;
+  }
+
+  :root {
+    --ink: #0e0d0c;
+    --paper: #f4f1ea;
+    --seal: #b4321f;
+    --gold: #c9a45c;
+    --panel: #151311;
+    --bar: #1c1916;
+    --rule: #2c2824;
+    --muted: #8f887c;
+    --fs: min(3.5vw, 2.6vh); /* 37.8px at 1080x1920, 20.8px at 1280x800 */
+    --mono: "DemoArabic", Consolas, "Courier New", monospace;
+    --arabic: "Segoe UI", Tahoma, "Geeza Pro", "Noto Naskh Arabic", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--fs) * 0.6);
+    padding: calc(var(--fs) * 0.9);
+  }
+
+  .window {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: calc(var(--fs) * 0.45);
+    overflow: hidden;
+    box-shadow: 0 calc(var(--fs) * 0.8) calc(var(--fs) * 2.4) rgba(0, 0, 0, 0.55);
+  }
+
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--fs) * 0.6);
+    padding: calc(var(--fs) * 0.45) calc(var(--fs) * 0.7);
+    background: var(--bar);
+    border-bottom: 2px solid var(--seal);
+    font-family: var(--arabic);
+    font-size: calc(var(--fs) * 0.62);
+    line-height: 1.3;
+  }
+
+  .dots { display: flex; gap: 0.45em; flex: none; }
+  .dots i { width: 0.75em; height: 0.75em; border-radius: 50%; display: block; }
+  .dots i:nth-child(1) { background: var(--seal); }
+  .dots i:nth-child(2) { background: var(--gold); }
+  .dots i:nth-child(3) { background: #4a453f; }
+
+  .bar .title { flex: 1; text-align: center; font-weight: 700; color: var(--paper); }
+  .bar .author { flex: none; color: var(--gold); }
+
+  .screen {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    padding: calc(var(--fs) * 0.8) calc(var(--fs) * 0.9);
+    font-family: var(--mono);
+    font-size: var(--fs);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .comment { color: var(--muted); margin-bottom: 0.7em; }
+  .line { margin: 0; }
+  .prompt { color: var(--gold); font-weight: 700; }
+  .exe { color: var(--muted); }
+  .sub { color: var(--gold); }
+  .arg { color: var(--paper); }
+
+  /* Tall screens: the argument gets its own indented line, so a quoted
+     Arabic phrase never wraps in the middle. */
+  @media (max-aspect-ratio: 1/1) {
+    .arg { display: block; margin-left: 1.2em; text-align: left; }
+  }
+
+  .out {
+    margin: 0.2em 0 0.95em;
+    padding: 0.05em 0 0.05em 0.65em;
+    border-left: 0.14em solid var(--seal);
+    color: var(--paper);
+    text-align: left;
+    animation: show 160ms ease-out;
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 0.55em;
+    height: 1.05em;
+    margin-left: 0.08em;
+    vertical-align: -0.18em;
+    background: var(--seal);
+    animation: blink 1s steps(1) infinite;
+  }
+  .typing .cursor { animation: none; }
+
+  .footer {
+    flex: none;
+    text-align: center;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: calc(var(--fs) * 0.55);
+    color: var(--gold);
+    letter-spacing: 0.02em;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes show { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+  <main class="window">
+    <header class="bar">
+      <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="title" dir="rtl">أدوات النص العربي — Python</span>
+      <span class="author" dir="rtl">حسام حسين خدا بخش</span>
+    </header>
+    <section class="screen" id="screen" aria-live="polite"></section>
+  </main>
+  <footer class="footer">github.com/hosam382/arabic-text-toolkit</footer>
+
+<script>
+  // Real commands and the real output of arabic_text.py for each one.
+  const STEPS = [
+    {
+      "cmd": "python arabic_text.py normalize \"أَهْلًا وَسَهْلًا بِكُمْ\"",
+      "out": "اهلا وسهلا بكم"
+    },
+    {
+      "cmd": "python arabic_text.py tashkeel \"مَدْرَسَتِي جَمِيلَةٌ وَمُعَلِّمِي رَائِعٌ\"",
+      "out": "مدرستي جميلة ومعلمي رائع"
+    },
+    {
+      "cmd": "python arabic_text.py digits-latin \"السعر ١٬٢٥٠٫٧٥ ريال\"",
+      "out": "السعر 1,250.75 ريال"
+    },
+    {
+      "cmd": "python arabic_text.py slug \"مرحبا بالعالم!\"",
+      "out": "مرحبا-بالعالم"
+    },
+    {
+      "cmd": "python arabic_text.py count \"السلام عليكم ورحمة الله وبركاته\"",
+      "out": "5"
+    },
+    {
+      "cmd": "python arabic_text.py ratio \"أحب البرمجة بلغة Python\"",
+      "out": "0.70"
+    }
+  ];
+
+  const TYPE_MS = 40;     // per character
+  const START_MS = 600;   // before the first command
+  const ENTER_MS = 350;   // between "pressing Enter" and the output
+  const PAUSE_MS = 1600;  // after each output
+
+  const screen = document.getElementById("screen");
+  const cursor = document.createElement("span");
+  cursor.className = "cursor";
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const scrollDown = () => { screen.scrollTop = screen.scrollHeight; };
+
+  function firstStrongIsArabic(text) {
+    const match = text.match(/[A-Za-z؀-ۿݐ-ݿࢠ-ࣿ]/);
+    return Boolean(match) && !/[A-Za-z]/.test(match[0]);
+  }
+
+  // "python arabic_text.py slug "..."" -> coloured pieces
+  function splitCommand(command) {
+    const m = command.match(/^(python arabic_text\.py )(\S+)( )(.*)$/);
+    if (!m) return [[command, "arg"]];
+    return [[m[1], "exe"], [m[2], "sub"], [m[3], ""], [m[4], "arg"]];
+  }
+
+  function newPromptLine() {
+    const line = document.createElement("div");
+    line.className = "line";
+    const prompt = document.createElement("span");
+    prompt.className = "prompt";
+    prompt.textContent = "$ ";
+    line.append(prompt, cursor);
+    screen.append(line);
+    scrollDown();
+    return line;
+  }
+
+  async function typeCommand(line, command) {
+    screen.classList.add("typing");
+    for (const [text, cls] of splitCommand(command)) {
+      // Arabic arguments are isolated right-to-left so they read correctly.
+      const node = document.createElement(cls === "arg" ? "bdi" : "span");
+      if (cls) node.className = cls;
+      if (cls === "arg") node.dir = firstStrongIsArabic(text) ? "rtl" : "ltr";
+      const typed = document.createTextNode("");
+      node.append(typed, cursor); // the cursor moves into the piece being typed
+      line.append(node);
+      for (const char of Array.from(text)) {
+        typed.data += char;
+        scrollDown();
+        await sleep(TYPE_MS);
+      }
+    }
+    screen.classList.remove("typing");
+  }
+
+  function reset() {
+    screen.textContent = "";
+    const comment = document.createElement("div");
+    comment.className = "comment";
+    comment.textContent = "# Python 3.9+, zero dependencies";
+    screen.append(comment);
+  }
+
+  window.DEMO_STEPS = STEPS;
+
+  // Expected length in seconds, before running it.
+  window.demoEstimate = function () {
+    const chars = STEPS.reduce((sum, s) => sum + Array.from(s.cmd).length, 0);
+    return (START_MS + chars * TYPE_MS + STEPS.length * (ENTER_MS + PAUSE_MS)) / 1000;
+  };
+
+  let running = null;
+  window.runDemo = function () {
+    if (running) return running;
+    running = (async () => {
+      const started = performance.now();
+      window.demoDone = false;
+      document.body.dataset.state = "running";
+      reset();
+      let line = newPromptLine();
+      await sleep(START_MS);
+      for (const step of STEPS) {
+        await typeCommand(line, step.cmd);
+        await sleep(ENTER_MS);
+        cursor.remove();
+        const out = document.createElement("div");
+        out.className = "out";
+        out.dir = "auto";
+        out.textContent = step.out;
+        screen.append(out);
+        line = newPromptLine(); // the next prompt waits with a blinking cursor
+        await sleep(PAUSE_MS);
+      }
+      const seconds = (performance.now() - started) / 1000;
+      window.demoSeconds = seconds;
+      window.demoDone = true;
+      document.body.dataset.state = "done";
+      running = null;
+      return seconds;
+    })();
+    return running;
+  };
+
+  reset();
+  newPromptLine();
+  if (new URLSearchParams(location.search).has("autoplay")) window.runDemo();
+</script>
+</body>
+</html>
