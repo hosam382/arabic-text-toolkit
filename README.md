@@ -1,5 +1,5 @@
 # أدوات النص العربي | Arabic Text Toolkit
-**By [Hassam Hussain Khada Bakhsa](https://github.com/hosam382)**
+**By [Hassam](https://github.com/hosam382)**
 
 ![demo](demo.gif)
 

@@ -18,7 +18,7 @@ Or from the command line:
     python arabic_text.py normalize "أَهْلًا وَسَهْلًا"
     python arabic_text.py --help
 
-Author:  Hassam Hussain Khada Bakhsa (https://github.com/hosam382)
+Author:  Hassam (https://github.com/hosam382)
 License: MIT
 """
 
